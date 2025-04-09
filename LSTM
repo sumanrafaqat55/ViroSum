@@ -1,0 +1,151 @@
+Step 1
+!pip install tensorflow numpy matplotlib
+
+Step 2
+import numpy as np
+import tensorflow as tf
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import LSTM, Dense, Embedding, TimeDistributed, RepeatVector
+import random
+
+
+Step 3
+
+file_path = "/content/1000 sequence of NS4A HCV text file.txt"  # Update with the path to your file
+with open(file_path, "r") as f:
+    sequences = [line.strip() for line in f.readlines() if not line.startswith(">")]
+
+# Display a sample
+print(f"Total sequences: {len(sequences)}")
+print(f"Example sequence: {sequences[0]}")
+
+
+Step 4
+# Define amino acids
+amino_acids = "ACDEFGHIKLMNPQRSTVWY"
+aa_to_index = {aa: i for i, aa in enumerate(amino_acids)}
+index_to_aa = {i: aa for aa, i in aa_to_index.items()}
+
+# Convert sequences to one-hot encoding
+def one_hot_encode(sequence, aa_to_index, max_length=57):
+    encoding = np.zeros((max_length, len(amino_acids)))
+    for i, aa in enumerate(sequence):
+        if i < max_length and aa in aa_to_index:
+            encoding[i, aa_to_index[aa]] = 1
+    return encoding
+
+encoded_sequences = np.array([one_hot_encode(seq, aa_to_index) for seq in sequences])
+
+# Check the shape
+print(f"Shape of encoded sequences: {encoded_sequences.shape}")
+
+Step 5
+# Prepare input (X) and output (y)
+X = encoded_sequences[:, :-1, :]  # All except the last amino acid
+y = encoded_sequences[:, 1:, :]  # All except the first amino acid
+
+print(f"Shape of X: {X.shape}, Shape of y: {y.shape}")
+
+
+Step 6
+# Define model
+model = Sequential([
+    LSTM(128, input_shape=(X.shape[1], X.shape[2]), return_sequences=True),
+    LSTM(128, return_sequences=True),
+    TimeDistributed(Dense(len(amino_acids), activation="softmax"))
+])
+
+model.compile(optimizer="adam", loss="categorical_crossentropy", metrics=["accuracy"])
+model.summary()
+
+Step 7
+# Train the model
+history = model.fit(X, y, batch_size=32, epochs=40, validation_split=0.2)
+
+Step 8
+
+# Generate 20 sequences, each with a different random prefix
+generated_sequences = [generate_sequence(model, random.choice(sequences)[:10]) for _ in range(20)]
+
+print("Generated sequences:")
+for i, seq in enumerate(generated_sequences, 1):
+    print(f"Sequence {i}: {seq}")
+
+Step 9
+
+import numpy as np
+from sklearn.model_selection import train_test_split
+
+# Split sequences into train and test sets
+train_sequences, test_sequences = train_test_split(sequences, test_size=0.2, random_state=42)
+
+def calculate_accuracy(model, sequences, aa_to_index, max_length):
+    """
+    Calculate model accuracy as a percentage.
+
+    Parameters:
+        model: Trained LSTM model
+        sequences: List of test sequences
+        aa_to_index: Dictionary mapping amino acids to indices
+        max_length: Maximum sequence length for padding
+
+    Returns:
+        Accuracy in percentage
+    """
+    # Prepare the test data and labels
+    test_data = np.zeros((len(sequences), max_length, len(aa_to_index)))  # Input
+    test_labels = np.zeros((len(sequences), max_length))  # Labels in categorical format
+
+    for i, seq in enumerate(sequences):
+        for t, aa in enumerate(seq):
+            if t < max_length:
+                test_data[i, t, aa_to_index[aa]] = 1  # One-hot encoding of input
+                if t < len(seq) - 1:
+                    test_labels[i, t] = aa_to_index[seq[t + 1]]  # Next amino acid as label
+
+    # Predict on test data
+    predictions = model.predict(test_data, verbose=0)
+
+    # Decode predictions
+    correct_predictions = 0
+    total_predictions = 0
+
+    for i in range(len(sequences)):
+        for t in range(len(sequences[i]) - 1):  # Exclude the last character
+            predicted_index = np.argmax(predictions[i, t])
+            true_index = int(test_labels[i, t])
+            if predicted_index == true_index:
+                correct_predictions += 1
+            total_predictions += 1
+
+    # Calculate accuracy
+    accuracy = (correct_predictions / total_predictions) * 100
+    return accuracy
+
+# Usage example
+max_length = 57  # Adjust this to match your data
+accuracy = calculate_accuracy(model, test_sequences, aa_to_index, max_length)
+print(f"Model Accuracy: {accuracy:.2f}%")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    
