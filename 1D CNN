@@ -1,0 +1,117 @@
+Step 1
+!pip install biopython
+
+
+Step 2
+import numpy as np
+import pandas as pd
+import tensorflow as tf
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Conv1D, MaxPooling1D, Flatten, Dense, Dropout
+from tensorflow.keras.preprocessing.sequence import pad_sequences
+from Bio import SeqIO
+import random
+
+# Set random seed for reproducibility
+random.seed(42)
+np.random.seed(42)
+tf.random.set_seed(42)
+
+
+Step 3
+def one_hot_encode(sequence, max_length):
+    # Encoding using A, T, C, G -> 0, 1, 2, 3 mapping
+    encoding = {'A': [1, 0, 0, 0], 'T': [0, 1, 0, 0], 'C': [0, 0, 1, 0], 'G': [0, 0, 0, 1]}
+
+    encoded_seq = []
+    for base in sequence:
+        encoded_seq.append(encoding.get(base, [0, 0, 0, 0]))  # Default to [0, 0, 0, 0] for non-standard bases
+
+    # Padding sequences to make them the same length
+    return np.array(encoded_seq[:max_length] + [[0, 0, 0, 0]] * (max_length - len(sequence)))
+
+# Read sequences from a FASTA file
+def load_sequences(fasta_file):
+    sequences = []
+    for seq_record in SeqIO.parse(fasta_file, "fasta"):
+        sequences.append(str(seq_record.seq))
+    return sequences
+
+fasta_file = "/content/1000 sequence of NS4A HCV text file.txt"  # Replace with the path to your fasta file
+sequences = load_sequences(fasta_file)
+max_length = max(len(seq) for seq in sequences)  # Get max sequence length
+
+# One-hot encode all sequences
+encoded_sequences = np.array([one_hot_encode(seq, max_length) for seq in sequences])
+
+
+Step 4
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Conv1D, MaxPooling1D, Dropout, Flatten, Dense
+from tensorflow.keras.optimizers import Adam
+
+# Define a simpler 1D CNN model
+def build_simple_cnn_model(input_shape):
+    model = Sequential()
+
+    # First convolutional layer
+    model.add(Conv1D(64, 3, activation='relu', input_shape=input_shape))  # 64 filters, kernel size 3
+    model.add(MaxPooling1D(2))  # Max pooling with size 2
+
+    # Dropout for regularization
+    model.add(Dropout(0.5))
+
+    # Flatten the output of the convolutional layers
+    model.add(Flatten())
+
+    # Fully connected layer (Dense)
+    model.add(Dense(64, activation='relu'))  # Reduced to 64 units for simplicity
+
+    # Output layer (binary classification, for example)
+    model.add(Dense(1, activation='sigmoid'))  # Sigmoid for binary classification
+
+    # Compile the model
+    model.compile(optimizer=Adam(), loss='binary_crossentropy', metrics=['accuracy'])
+
+    return model
+
+# Define the input shape (sequence length and 4 possible nucleotides)
+input_shape = (max_length, 4)  # max_length depends on your input data
+
+# Build the simplified CNN model
+model = build_simple_cnn_model(input_shape)
+
+# Show the model summary
+model.summary()
+
+
+Step 5
+# Split the data into training and validation sets (80% train, 20% validation)
+from sklearn.model_selection import train_test_split
+
+X_train, X_val = train_test_split(encoded_sequences, test_size=0.2, random_state=42)
+y_train = np.random.randint(0, 2, size=len(X_train))  # Example: random binary labels for training
+y_val = np.random.randint(0, 2, size=len(X_val))  # Example: random binary labels for validation
+
+# Train the model
+model.fit(X_train, y_train, epochs=40, batch_size=32, validation_data=(X_val, y_val))
+
+
+Step 6
+# Randomly select 20 sequences from the dataset
+random_sequences = random.sample(sequences, 20)
+encoded_random_sequences = np.array([one_hot_encode(seq, max_length) for seq in random_sequences])
+
+# Reshape the input to match the model's expected input shape
+encoded_random_sequences = encoded_random_sequences.reshape(-1, max_length, 4)
+
+# Generate predictions
+predictions = model.predict(encoded_random_sequences)
+print(predictions)
+
+
+Step 7
+# Print the selected random sequences
+for seq in random_sequences:
+    print(seq)
+
